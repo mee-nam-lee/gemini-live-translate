@@ -1,6 +1,6 @@
 # Google Gemini 3.5 Live Translate Application
 
-`gemini-3.5-live-translate-preview` 모델과 Google GenAI SDK (`google-genai`)를 활용하여 구현한 **실시간 자막 통역(Live Transcript Translation)** 반응형 웹 애플리케이션입니다. 데스크톱 웹과 iPhone / Android 모바일 브라우저에서 별도 앱 설치 없이 동작합니다.
+`gemini-3.5-live-translate-preview` 모델과 Google GenAI SDK (`google-genai`)를 활용하여 구현한 **실시간 자막 통역(Live Transcript Translation)** 반응형 웹 애플리케이션입니다. 데스크톱 웹과 iPhone / Android 모바일 브라우저에서 별도 앱 설치 없이 동작하며, AirPods 입·출력 분리가 필요한 경우를 위해 선택형 [iOS 네이티브 앱](#-ios-네이티브-앱-선택)을 함께 제공합니다.
 
 ---
 
@@ -19,8 +19,8 @@
 
 | 영역 | 설명 |
 | :--- | :--- |
-| **상단 헤더** | 세션 상태(`대기 중` / `실시간 통역 중` + 경과 시간 / 재연결 중), `회의 요약`(.md 회의록 즉시 저장), `원문/번역문 저장`(.md 기록 즉시 저장), 기록 초기화, 로그아웃 — 모바일에서는 아이콘만 표시 |
-| **언어 컨트롤 바** | Source 언어(자동 감지 시 감지 언어 배지 표시) ⇄ Target 언어 선택, `통역 시작` / `통역 종료` 버튼 (통역 중에는 빨간색 + 입력 레벨 이퀄라이저 표시, 모바일에서는 전체 폭) |
+| **상단 헤더** | 세션 상태(`대기 중` / `실시간 통역 중` + 경과 시간 / 재연결 중), `회의 요약`(.md 회의록 즉시 저장), `원문/번역문 저장`(.md 기록 즉시 저장), 기록 초기화 — 모바일에서는 아이콘만 표시 |
+| **언어 컨트롤 바** | Source 언어(자동 감지 시 감지 언어 배지 표시) ⇄ Target 언어 선택, **`번역 음성 듣기` 토글**(ON 시 이어폰 출력 + `echoCancellation: false`), `통역 시작` / `통역 종료` 버튼 |
 | **Source 패널 (위)** | 인식된 원문이 문장 단위로 실시간 표시 (진행 중 문장은 파란색). `복사`, `접기`(접으면 최신 한 줄만 미리보기로 남고 Target 패널이 확장) |
 | **Target 패널 (아래)** | 번역문이 문장 단위로 실시간 표시 (진행 중 문장은 초록색). `복사` |
 
@@ -31,12 +31,12 @@
 ## ✨ 주요 기능
 
 1. **Gemini 3.5 Live Translate 전용 모델 연동 (`gemini-3.5-live-translate-preview`)**
-   - `echo_target_language=True` 기본 활성화 (입력 음성이 이미 Target 언어인 경우 번역 대신 원어 그대로 전사)
+   - `echo_target_language=False` 기본값 (입력 음성이 이미 Target 언어여도 번역 경로로 처리. `True`로 설정 시 번역 대신 원어 그대로 전사)
    - `input_audio_transcription` 및 `output_audio_transcription` 동시 스트리밍
    - 16kHz 16-bit Mono PCM 마이크 입력을 WebSocket으로 서버에 스트리밍
-2. **자막 전용 실시간 통역**
-   - 회의실/강연장 등에서 하울링 없이 사용할 수 있도록 **음성 출력 없이 자막(원문/번역문)만 실시간 표시**합니다.
-   - `통역 시작` 버튼 하나로 마이크 캡처와 통역 세션을 시작/종료합니다.
+2. **자막 전용 모드 & `번역 음성 듣기` 토글**
+   - **기본 상태 (`번역 음성 듣기` OFF)**: 하울링 없이 자막(원문/번역문)만 실시간 표시하며 `echoCancellation: true`로 동작합니다.
+   - **`번역 음성 듣기` ON**: Gemini Live API가 생성하는 번역 음성(24kHz PCM)을 이어폰(AirPods 등)으로 실시간 스트리밍 재생하며, 회의실 원거리 발화자 음성이 통화 필터로 감쇠되지 않도록 **`echoCancellation: false`로 자동 전환**됩니다.
 3. **Source / Target 언어 설정 및 양방향 전환 (`⇄`)**
    - **Source Language**: 기본값 `English (en)` + `🌐 자동 감지` + 공식 지원 **78개 전체 언어(BCP-47)** (자동 감지 시 실시간 감지 언어 배지 표시)
    - **Target Language**: 기본값 `Korean (ko)` + 공식 지원 **78개 전체 언어(BCP-47)**
@@ -48,7 +48,9 @@
 5. **원클릭 회의록 / 기록 저장 (`.md`)**
    - **`회의 요약`**: 누적된 대화를 바탕으로 `핵심 주제·개요 / 안건별 논의 사항 / 결정 사항·Action Items` 구조의 회의록을 생성하여 즉시 `.md` 파일로 저장 (`POST /api/summarize`). 요약 길이는 원본 분량에 비례해 자동 조절되며, STT 오인식 가능성이 있는 약어는 임의로 풀이하지 않습니다.
    - **`원문/번역문 저장`**: 전체 원문(Source) → 전체 번역문(Target) 순으로 분리 기록된 `.md` 파일을 즉시 저장
-
+6. **ADC 기반 인증 (키 파일 / Secret Manager 불필요)**
+   - Google Cloud Application Default Credentials로 Vertex AI의 Gemini를 호출합니다 (로컬: `gcloud auth application-default login`, Cloud Run: 서비스 계정).
+   - 액세스 토큰은 만료 15분 전에 자동 갱신되어 장시간 WebSocket 세션 중에도 끊기지 않습니다.
 
 ---
 
@@ -58,13 +60,17 @@
 live-translate/
 ├── app/
 │   ├── __init__.py
-│   ├── config.py          # 환경변수(.env), ADC/API Key 클라이언트 팩토리, 로그인 설정, 78개 지원 언어 정의
-│   └── main.py            # FastAPI 서버, 로그인 게이트, /ws/translate 양방향 스트리밍, 세션 관리, /api/summarize
+│   ├── config.py          # 환경변수(.env), ADC/API Key GenAI 클라이언트 팩토리, 로그인 설정, 78개 지원 언어 정의
+│   └── main.py            # FastAPI 서버, 로그인 게이트, /ws/translate 양방향 스트리밍(자막+번역오디오), /api/summarize
 ├── static/
-│   ├── index.html         # 반응형 웹/모바일 UI (상: Source, 하: Target)
+│   ├── index.html         # 반응형 웹/모바일 UI (번역 음성 듣기 스위치 토글 포함)
 │   ├── login.html         # 로그인 화면
 │   ├── styles.css         # Google 4-Color (#4285F4, #EA4335, #FBBC05, #34A853) + 화이트 테마
-│   └── app.js             # Web Audio API 16kHz 캡처, WebSocket 스트리밍, 자동 스크롤, .md 저장
+│   └── app.js             # iOS Native Audio Bridge + Web Audio 16kHz 캡처/24kHz 재생, echoCancellation 연동
+├── ios/                   # iPhone 네이티브 하이브리드 앱 (상세: ios/README.md)
+│   ├── LiveTranslateApp.xcodeproj
+│   ├── LiveTranslateApp/  # SwiftUI + WKWebView + NativeAudioBridge (AVAudioSession/AVAudioEngine)
+│   └── README.md
 ├── docs/
 │   ├── screenshot-main.png   # README용 데스크톱 화면 캡처
 │   └── screenshot-mobile.png # README용 모바일(iPhone) 화면 캡처
@@ -86,36 +92,47 @@ cp .env.example .env
 ```
 
 ```dotenv
-# 인증 모드: adc (기본값, Google Cloud ADC / Vertex AI) 또는 api_key
+# Authentication Mode: "adc" (default, uses Google Cloud ADC / Vertex AI Agent Platform) or "api_key"
 AUTH_MODE=adc
 
-# ADC 모드 사용 시 GCP 프로젝트 및 리전 (gemini-3.5-live-translate-preview는 global 리전 사용)
-GOOGLE_CLOUD_PROJECT=<YOUR_GCP_PROJECT_ID>
+# Google Cloud Project & Location (Cloud Run host & Gemini/Vertex AI project, authenticated via ADC)
+# Note: gemini-3.5-live-translate-preview requires location="global" on Vertex AI / Agent Platform
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=global
 
-# API Key 모드 사용 시 (AUTH_MODE=api_key)
+# Gemini API Key (Optional: Used when AUTH_MODE=api_key)
 GEMINI_API_KEY=
 
-# 모델 설정
+# Model Configuration
 LIVE_TRANSLATE_MODEL=gemini-3.5-live-translate-preview
 SUMMARY_MODEL=gemini-3.8-flash
 
-# 10분(600초) 이상 무음성 시 자동 세션 종료
+# Session Management Configuration
+# Inactivity timeout in seconds (Default: 600s = 10 minutes)
 INACTIVITY_TIMEOUT_SECONDS=600
 
-# 로그인 게이트 (비워두면 로그인 비활성화)
-APP_LOGIN_PASSWORD=<YOUR_SHARED_PASSWORD>
-# 로그인 쿠키 서명용 비밀키 (openssl rand -hex 32 로 생성, 배포 간 동일하게 유지)
-APP_SESSION_SECRET=<RANDOM_HEX_SECRET>
-# 로그인 유지 시간 (시간 단위)
+# Login Gate (fixed shared password entered on the login page; leave empty to disable login)
+APP_LOGIN_PASSWORD=change-me
+# Secret for signing login cookies (any long random string). Keep stable across deploys.
+# Generate with: openssl rand -hex 32
+APP_SESSION_SECRET=
+# Login session lifetime in hours
 APP_SESSION_HOURS=12
 ```
 
 | 변수 | 설명 |
 | :--- | :--- |
-| `APP_LOGIN_PASSWORD` | 로그인 화면에서 입력할 고정 비밀번호 |
+| `AUTH_MODE` | `adc`(기본값, Vertex AI) 또는 `api_key`(Gemini Developer API, `GEMINI_API_KEY` 필요) |
+| `GOOGLE_CLOUD_PROJECT` | Cloud Run 서비스가 실행되고 Gemini 모델을 호출하는 프로젝트. 비워두면 `gcloud config`의 활성 프로젝트 사용. 인증은 ADC(로컬: `gcloud auth application-default login`, Cloud Run: 서비스 계정)를 사용하며 토큰은 만료 15분 전 자동 갱신 |
+| `GOOGLE_CLOUD_LOCATION` | `gemini-3.5-live-translate-preview`는 `global` 필요 |
+| `LIVE_TRANSLATE_MODEL` / `SUMMARY_MODEL` | 실시간 통역 모델 / 회의 요약 모델 |
+| `INACTIVITY_TIMEOUT_SECONDS` | 무음 상태가 이 시간 이상 지속되면 통역 세션 자동 종료 |
+| `APP_LOGIN_PASSWORD` | 로그인 화면에서 입력할 고정 비밀번호. Cloud Run에서 비어 있으면 앱이 **공개 상태**가 되며 시작 시 CRITICAL 로그를 남김 |
+| `APP_LOGIN_DISABLED` | `true`이면 로그인 게이트를 명시적으로 끔 (로컬 개발/의도적 공개 배포용, `.env.example`에는 미포함) |
 | `APP_SESSION_SECRET` | 로그인 쿠키를 HMAC 서명하는 서버 전용 비밀키. 비워두면 프로세스마다 랜덤 생성되어 **재시작/다중 인스턴스 시 로그인이 풀리므로** 운영 환경에서는 반드시 고정값을 지정 |
 | `APP_SESSION_HOURS` | 로그인 쿠키 유효 시간 |
+
+> 실제 환경변수(Cloud Run `--set-env-vars`)가 `.env` 값보다 우선합니다. `.env`는 컨테이너 이미지에 포함되지 않으므로 Cloud Run에는 반드시 환경변수로 전달하세요.
 
 ---
 
@@ -150,7 +167,6 @@ python3 -m venv .venv
 
 ## ☁️ Cloud Run 배포 방법
 
-
 ### 1. 사전 준비
 
 ```bash
@@ -159,11 +175,11 @@ gcloud config set project <YOUR_GCP_PROJECT_ID>
 ```
 
 다음 API가 활성화되어 있어야 합니다: Cloud Run, Cloud Build, Artifact Registry, Vertex AI.
-Cloud Run 서비스 계정(기본: Compute Engine 기본 서비스 계정)에 **`roles/aiplatform.user`** 역할이 필요합니다.
+Cloud Run 서비스 계정(기본: Compute Engine 기본 서비스 계정)은 ADC로 Gemini를 호출하므로 `GOOGLE_CLOUD_PROJECT`에 대한 **`roles/aiplatform.user`** 권한이 필요합니다.
 
 ### 2. 배포
 
-`.env`의 값을 셸 환경변수로 로드한 뒤 `--set-env-vars`로 전달하면 비밀값이 명령어에 직접 노출되지 않습니다.
+`.env`의 값을 셸 환경변수로 로드한 뒤 `--set-env-vars`로 전달하면 Cloud Run은 `GOOGLE_CLOUD_PROJECT`에서 실행되면서 서비스 계정의 ADC로 같은 프로젝트의 Gemini(Vertex AI)를 호출합니다.
 
 ```bash
 set -a; source .env; set +a
@@ -198,12 +214,29 @@ gcloud run deploy live-translate \
 
 ---
 
+## 📱 iOS 네이티브 앱 (선택)
+
+모바일 웹만으로도 통역은 가능하지만, iPhone 브라우저(`getUserMedia`)는 AirPods 연결 시 오디오 세션을 통화용 HFP로 전환해 **입력과 출력이 모두 AirPods으로 묶입니다**. [`ios/`](ios/README.md)의 하이브리드 앱은 이 문제를 해결합니다.
+
+- **입·출력 분리**: 네이티브 `AVAudioSession`(`.playAndRecord` + `.allowBluetoothA2DP`, HFP 비활성화)과 `AVAudioEngine` 브릿지로 **마이크 입력은 iPhone 본체 내장 마이크(회의실 수음)**, **번역 음성 출력은 AirPods(고음질 A2DP)**로 분리합니다.
+- **동일한 웹 UI 재사용**: `WKWebView`로 배포된 Cloud Run 서버를 열고, [`static/app.js`](static/app.js)가 네이티브 브릿지를 감지하면 웹 마이크 대신 네이티브 16kHz PCM 캡처 / 24kHz 재생을 사용합니다.
+- **간편 연결**: 첫 실행 시 QR 코드로 서버 URL을 설정합니다 (`https://`만 허용, `*.run.app` 외 호스트는 확인 후 전환).
+- **안정성**: 전화·Siri 인터럽션, 이어폰 연결/분리, 백그라운드 전환 시 수음 자동 일시정지/재개.
+- **빌드**: Xcode에서 `ios/LiveTranslateApp.xcodeproj`를 열고 Signing Team 설정 후 실기기에 설치합니다.
+
+> 아키텍처, Swift ↔ JS 콜백 계약, 보안 정책, 빌드/설치 절차 등 상세 내용은 **[ios/README.md](ios/README.md)** 를 참고하세요.
+
+---
+
 ## 🔌 API 요약
 
 | 경로 | 설명 |
 | :--- | :--- |
 | `GET /` | 통역 화면 (로그인 필요) |
-| `GET /login`, `POST /api/login`, `POST /api/logout` | 로그인 게이트 |
-| `GET /api/config` | 모델/언어 설정 |
-| `WS /ws/translate` | 16kHz PCM 업스트림 + 원문/번역문 자막 다운스트림 |
-| `POST /api/summarize` | 대화 기록 기반 회의록(Markdown) 생성 |
+| `GET /login`, `POST /api/login` | 로그인 게이트 (IP당 5분 내 10회 실패 시 `429`) |
+| `GET /healthz` | 헬스 체크 (로그인 불필요) |
+| `GET /api/config` | 기본 언어/지원 언어 목록 등 UI 설정 |
+| `WS /ws/translate` | 16kHz PCM 업스트림 + 원문/번역문 자막 다운스트림. 종료 코드: `4401` 로그인 필요, `4400` 잘못된 파라미터, `4403` 허용되지 않은 Origin. 치명적 오류는 `{"type":"error","fatal":true}` 전송 후 종료 |
+| `POST /api/summarize` | 대화 기록 기반 회의록(Markdown) 생성 (최대 5,000개 항목/40만 자, 초과 시 `413`) |
+
+> Cloud Run 환경(`K_SERVICE` 설정 시)에서는 `/docs`, `/openapi.json`이 비활성화됩니다.

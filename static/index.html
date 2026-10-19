@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=20261013i" />
+  <link rel="stylesheet" href="/static/styles.css?v=20261017c" />
 </head>
 <body>
   <!-- Google 4-Color Signature Top Bar -->
@@ -25,7 +25,7 @@
     <header class="app-header">
       <div class="brand-group">
         <div class="brand-logo" aria-hidden="true">
-          <span class="material-symbols-outlined">translate</span>
+          <span class="material-symbols-outlined" aria-hidden="true">translate</span>
         </div>
         <h1 class="brand-heading">Gemini Live Translate</h1>
       </div>
@@ -33,31 +33,26 @@
       <div class="header-actions">
         <!-- Session Status Pill -->
         <div class="session-status-pill" id="sessionStatusPill" data-state="idle">
-          <span class="status-dot"></span>
-          <span id="sessionStatusText">대기 중</span>
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="sessionStatusText" role="status" aria-live="polite">대기 중</span>
           <span id="sessionTimer" class="session-timer" hidden>00:00</span>
         </div>
 
         <!-- Direct Meeting Summary (.md) Button -->
-        <button type="button" class="btn btn-tonal btn-yellow" id="btnSummary" title="대화 내용을 AI 회의록으로 요약하여 .md 파일로 바로 저장합니다">
-          <span class="material-symbols-outlined" id="summaryBtnIcon">auto_awesome</span>
+        <button type="button" class="btn btn-tonal btn-yellow" id="btnSummary" title="대화 내용을 AI 회의록으로 요약하여 .md 파일로 바로 저장합니다" aria-label="AI 회의 요약 (.md 저장)">
+          <span class="material-symbols-outlined" id="summaryBtnIcon" aria-hidden="true">auto_awesome</span>
           <span class="btn-label" id="summaryBtnLabel">회의 요약</span>
         </button>
 
-        <!-- Direct Save Source / Target (.txt) Button -->
-        <button type="button" class="btn btn-tonal btn-green" id="btnOpenDownload" title="전체 원문(Source)과 전체 번역문(Target)을 분리하여 .txt 파일로 바로 저장합니다">
-          <span class="material-symbols-outlined">download</span>
+        <!-- Direct Save Source / Target (.md) Button -->
+        <button type="button" class="btn btn-tonal btn-green" id="btnOpenDownload" title="전체 원문(Source)과 전체 번역문(Target)을 분리하여 .md 파일로 바로 저장합니다" aria-label="원문/번역문 저장 (.md)">
+          <span class="material-symbols-outlined" aria-hidden="true">download</span>
           <span class="btn-label">원문/번역문 저장</span>
         </button>
 
         <!-- Clear Button -->
         <button type="button" class="btn btn-icon-only" id="btnClear" title="대화 기록 초기화" aria-label="대화 기록 초기화">
-          <span class="material-symbols-outlined">delete_sweep</span>
-        </button>
-
-        <!-- Logout Button -->
-        <button type="button" class="btn btn-icon-only btn-logout" id="btnLogout" title="로그아웃" aria-label="로그아웃">
-          <span class="material-symbols-outlined">logout</span>
+          <span class="material-symbols-outlined" aria-hidden="true">delete_sweep</span>
         </button>
       </div>
     </header>
@@ -68,98 +63,20 @@
         <div class="lang-box source-lang-box">
           <label for="sourceLangSelect" class="lang-label">
             <span class="lang-dot blue"></span>
-            Source Language
+            <span class="lang-label-text">Source <span class="lang-word-optional">Language</span></span>
             <span id="detectedLangChip" class="detected-chip" hidden>감지: -</span>
           </label>
           <div class="select-wrap">
-            <select id="sourceLangSelect" class="lang-select" aria-label="Source Language">
-              <option value="auto">🌐 자동 감지 (Auto Detect)</option>
+            <select id="sourceLangSelect" class="lang-select">
+              <!-- Placeholder: app.js populates the full official list (DEFAULT_SUPPORTED_LANGUAGES, then /api/config) on boot -->
               <option value="en" selected>영어 (English · en)</option>
-              <option value="ko">한국어 (Korean · ko)</option>
-              <option value="ja">일본어 (Japanese · ja)</option>
-              <option value="zh-Hans">중국어 (간체) (Chinese (Simplified) · zh-Hans)</option>
-              <option value="zh-Hant">중국어 (번체) (Chinese (Traditional) · zh-Hant)</option>
-              <option value="es">스페인어 (Spanish · es)</option>
-              <option value="fr">프랑스어 (French · fr)</option>
-              <option value="de">독일어 (German · de)</option>
-              <option value="vi">베트남어 (Vietnamese · vi)</option>
-              <option value="th">태국어 (Thai · th)</option>
-              <option value="id">인도네시아어 (Indonesian · id)</option>
-              <option value="pt-BR">포르투갈어 (브라질) (Portuguese (Brazil) · pt-BR)</option>
-              <option value="ru">러시아어 (Russian · ru)</option>
-              <option value="ar">아랍어 (Arabic · ar)</option>
-              <option value="hi">힌디어 (Hindi · hi)</option>
-              <option value="gl">갈리시아어 (Galician · gl)</option>
-              <option value="gu">구자라트어 (Gujarati · gu)</option>
-              <option value="el">그리스어 (Greek · el)</option>
-              <option value="nl">네덜란드어 (Dutch · nl)</option>
-              <option value="ne">네팔어 (Nepali · ne)</option>
-              <option value="no">노르웨이어 (Norwegian · no)</option>
-              <option value="nb">노르웨이어 (보크몰) (Norwegian Bokmål · nb)</option>
-              <option value="da">덴마크어 (Danish · da)</option>
-              <option value="lo">라오어 (Lao · lo)</option>
-              <option value="lv">라트비아어 (Latvian · lv)</option>
-              <option value="ro">루마니아어 (Romanian · ro)</option>
-              <option value="lt">리투아니아어 (Lithuanian · lt)</option>
-              <option value="mr">마라티어 (Marathi · mr)</option>
-              <option value="mk">마케도니아어 (Macedonian · mk)</option>
-              <option value="ml">말라얄람어 (Malayalam · ml)</option>
-              <option value="ms">말레이어 (Malay · ms)</option>
-              <option value="mn">몽골어 (Mongolian · mn)</option>
-              <option value="my">미얀마어 (버마어) (Burmese (Myanmar) · my)</option>
-              <option value="eu">바스크어 (Basque · eu)</option>
-              <option value="be">벨라루스어 (Belarusian · be)</option>
-              <option value="bn">벵골어 (Bengali · bn)</option>
-              <option value="bg">불가리아어 (Bulgarian · bg)</option>
-              <option value="sr">세르비아어 (Serbian · sr)</option>
-              <option value="su">순다어 (Sundanese · su)</option>
-              <option value="sw">스와힐리어 (Swahili · sw)</option>
-              <option value="sv">스웨덴어 (Swedish · sv)</option>
-              <option value="sk">슬로바키아어 (Slovak · sk)</option>
-              <option value="sl">슬로베니아어 (Slovenian · sl)</option>
-              <option value="sd">신디어 (Sindhi · sd)</option>
-              <option value="si">싱할라어 (Sinhala · si)</option>
-              <option value="hy">아르메니아어 (Armenian · hy)</option>
-              <option value="is">아이슬란드어 (Icelandic · is)</option>
-              <option value="az">아제르바이잔어 (Azerbaijani · az)</option>
-              <option value="ak">아칸어 (Akan · ak)</option>
-              <option value="af">아프리칸스어 (Afrikaans · af)</option>
-              <option value="sq">알바니아어 (Albanian · sq)</option>
-              <option value="am">암하라어 (Amharic · am)</option>
-              <option value="et">에스토니아어 (Estonian · et)</option>
-              <option value="ur">우르두어 (Urdu · ur)</option>
-              <option value="uz">우즈베크어 (Uzbek · uz)</option>
-              <option value="uk">우크라이나어 (Ukrainian · uk)</option>
-              <option value="it">이탈리아어 (Italian · it)</option>
-              <option value="jv">자바어 (Javanese · jv)</option>
-              <option value="ka">조지아어 (Georgian · ka)</option>
-              <option value="zu">줄루어 (Zulu · zu)</option>
-              <option value="cs">체코어 (Czech · cs)</option>
-              <option value="kk">카자흐어 (Kazakh · kk)</option>
-              <option value="ca">카탈로니아어 (Catalan · ca)</option>
-              <option value="kn">칸나다어 (Kannada · kn)</option>
-              <option value="hr">크로아티아어 (Croatian · hr)</option>
-              <option value="km">크메르어 (Khmer · km)</option>
-              <option value="rw">키냐르완다어 (Kinyarwanda · rw)</option>
-              <option value="ta">타밀어 (Tamil · ta)</option>
-              <option value="te">텔루구어 (Telugu · te)</option>
-              <option value="tr">튀르키예어 (Turkish · tr)</option>
-              <option value="pa">펀자브어 (Punjabi · pa)</option>
-              <option value="fa">페르시아어 (Persian · fa)</option>
-              <option value="pt-PT">포르투갈어 (포르투갈) (Portuguese (Portugal) · pt-PT)</option>
-              <option value="pl">폴란드어 (Polish · pl)</option>
-              <option value="fi">핀란드어 (Finnish · fi)</option>
-              <option value="fil">필리핀어 (Filipino · fil)</option>
-              <option value="ha">하우사어 (Hausa · ha)</option>
-              <option value="hu">헝가리어 (Hungarian · hu)</option>
-              <option value="he">히브리어 (Hebrew · he)</option>
             </select>
             <span class="material-symbols-outlined select-chevron" aria-hidden="true">expand_more</span>
           </div>
         </div>
 
         <button type="button" class="swap-btn" id="btnSwapLang" title="Source ↔ Target 언어 전환" aria-label="Source와 Target 언어 전환">
-          <span class="material-symbols-outlined">swap_horiz</span>
+          <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
         </button>
 
         <div class="lang-box target-lang-box">
@@ -168,86 +85,8 @@
             Target Language
           </label>
           <div class="select-wrap">
-            <select id="targetLangSelect" class="lang-select" aria-label="Target Language">
-              <option value="en">영어 (English · en)</option>
+            <select id="targetLangSelect" class="lang-select">
               <option value="ko" selected>한국어 (Korean · ko)</option>
-              <option value="ja">일본어 (Japanese · ja)</option>
-              <option value="zh-Hans">중국어 (간체) (Chinese (Simplified) · zh-Hans)</option>
-              <option value="zh-Hant">중국어 (번체) (Chinese (Traditional) · zh-Hant)</option>
-              <option value="es">스페인어 (Spanish · es)</option>
-              <option value="fr">프랑스어 (French · fr)</option>
-              <option value="de">독일어 (German · de)</option>
-              <option value="vi">베트남어 (Vietnamese · vi)</option>
-              <option value="th">태국어 (Thai · th)</option>
-              <option value="id">인도네시아어 (Indonesian · id)</option>
-              <option value="pt-BR">포르투갈어 (브라질) (Portuguese (Brazil) · pt-BR)</option>
-              <option value="ru">러시아어 (Russian · ru)</option>
-              <option value="ar">아랍어 (Arabic · ar)</option>
-              <option value="hi">힌디어 (Hindi · hi)</option>
-              <option value="gl">갈리시아어 (Galician · gl)</option>
-              <option value="gu">구자라트어 (Gujarati · gu)</option>
-              <option value="el">그리스어 (Greek · el)</option>
-              <option value="nl">네덜란드어 (Dutch · nl)</option>
-              <option value="ne">네팔어 (Nepali · ne)</option>
-              <option value="no">노르웨이어 (Norwegian · no)</option>
-              <option value="nb">노르웨이어 (보크몰) (Norwegian Bokmål · nb)</option>
-              <option value="da">덴마크어 (Danish · da)</option>
-              <option value="lo">라오어 (Lao · lo)</option>
-              <option value="lv">라트비아어 (Latvian · lv)</option>
-              <option value="ro">루마니아어 (Romanian · ro)</option>
-              <option value="lt">리투아니아어 (Lithuanian · lt)</option>
-              <option value="mr">마라티어 (Marathi · mr)</option>
-              <option value="mk">마케도니아어 (Macedonian · mk)</option>
-              <option value="ml">말라얄람어 (Malayalam · ml)</option>
-              <option value="ms">말레이어 (Malay · ms)</option>
-              <option value="mn">몽골어 (Mongolian · mn)</option>
-              <option value="my">미얀마어 (버마어) (Burmese (Myanmar) · my)</option>
-              <option value="eu">바스크어 (Basque · eu)</option>
-              <option value="be">벨라루스어 (Belarusian · be)</option>
-              <option value="bn">벵골어 (Bengali · bn)</option>
-              <option value="bg">불가리아어 (Bulgarian · bg)</option>
-              <option value="sr">세르비아어 (Serbian · sr)</option>
-              <option value="su">순다어 (Sundanese · su)</option>
-              <option value="sw">스와힐리어 (Swahili · sw)</option>
-              <option value="sv">스웨덴어 (Swedish · sv)</option>
-              <option value="sk">슬로바키아어 (Slovak · sk)</option>
-              <option value="sl">슬로베니아어 (Slovenian · sl)</option>
-              <option value="sd">신디어 (Sindhi · sd)</option>
-              <option value="si">싱할라어 (Sinhala · si)</option>
-              <option value="hy">아르메니아어 (Armenian · hy)</option>
-              <option value="is">아이슬란드어 (Icelandic · is)</option>
-              <option value="az">아제르바이잔어 (Azerbaijani · az)</option>
-              <option value="ak">아칸어 (Akan · ak)</option>
-              <option value="af">아프리칸스어 (Afrikaans · af)</option>
-              <option value="sq">알바니아어 (Albanian · sq)</option>
-              <option value="am">암하라어 (Amharic · am)</option>
-              <option value="et">에스토니아어 (Estonian · et)</option>
-              <option value="ur">우르두어 (Urdu · ur)</option>
-              <option value="uz">우즈베크어 (Uzbek · uz)</option>
-              <option value="uk">우크라이나어 (Ukrainian · uk)</option>
-              <option value="it">이탈리아어 (Italian · it)</option>
-              <option value="jv">자바어 (Javanese · jv)</option>
-              <option value="ka">조지아어 (Georgian · ka)</option>
-              <option value="zu">줄루어 (Zulu · zu)</option>
-              <option value="cs">체코어 (Czech · cs)</option>
-              <option value="kk">카자흐어 (Kazakh · kk)</option>
-              <option value="ca">카탈로니아어 (Catalan · ca)</option>
-              <option value="kn">칸나다어 (Kannada · kn)</option>
-              <option value="hr">크로아티아어 (Croatian · hr)</option>
-              <option value="km">크메르어 (Khmer · km)</option>
-              <option value="rw">키냐르완다어 (Kinyarwanda · rw)</option>
-              <option value="ta">타밀어 (Tamil · ta)</option>
-              <option value="te">텔루구어 (Telugu · te)</option>
-              <option value="tr">튀르키예어 (Turkish · tr)</option>
-              <option value="pa">펀자브어 (Punjabi · pa)</option>
-              <option value="fa">페르시아어 (Persian · fa)</option>
-              <option value="pt-PT">포르투갈어 (포르투갈) (Portuguese (Portugal) · pt-PT)</option>
-              <option value="pl">폴란드어 (Polish · pl)</option>
-              <option value="fi">핀란드어 (Finnish · fi)</option>
-              <option value="fil">필리핀어 (Filipino · fil)</option>
-              <option value="ha">하우사어 (Hausa · ha)</option>
-              <option value="hu">헝가리어 (Hungarian · hu)</option>
-              <option value="he">히브리어 (Hebrew · he)</option>
             </select>
             <span class="material-symbols-outlined select-chevron" aria-hidden="true">expand_more</span>
           </div>
@@ -255,9 +94,61 @@
       </div>
 
       <div class="audio-controls-group">
+        <!-- Desktop-only Audio Input Source Selector: "주변 소리 (내장 마이크)" vs "PC 오디오" (Hidden on iPhone / Mobile) -->
+        <div
+          class="desktop-source-segment"
+          id="desktopSourceSegment"
+          role="group"
+          aria-label="오디오 입력 소스 선택"
+          hidden
+        >
+          <button
+            type="button"
+            class="source-seg-btn"
+            id="btnSourceMic"
+            data-source="mic"
+            data-active="true"
+            aria-pressed="true"
+            title="데스크탑 외부 주변/회의실 발화를 내장 마이크로 수음합니다."
+          >
+            <span class="material-symbols-outlined" aria-hidden="true">mic</span>
+            <span>주변 소리</span>
+          </button>
+          <button
+            type="button"
+            class="source-seg-btn"
+            id="btnSourceDesktop"
+            data-source="desktop"
+            data-active="false"
+            aria-pressed="false"
+            title="동일 데스크탑에서 재생되는 오디오(Chrome 탭, QuickTime Player 등)만 직접 수음합니다."
+          >
+            <span class="material-symbols-outlined" id="desktopAudioIcon" aria-hidden="true">desktop_windows</span>
+            <span id="desktopAudioText">PC 오디오</span>
+          </button>
+        </div>
+
+        <!-- Translated Audio Output Toggle ("번역 음성 듣기") -->
+        <label
+          class="audio-output-toggle"
+          id="audioOutputToggleLabel"
+          for="toggleAudioOutput"
+          data-active="false"
+          title="번역된 음성을 실시간 재생합니다. 이어폰(AirPods 등) 사용을 권장하며, 이어폰 없이 스피커로 재생하면 되울림 방지를 위해 echoCancellation이 자동으로 켜집니다."
+        >
+          <span class="material-symbols-outlined" id="audioOutputIcon" aria-hidden="true">volume_off</span>
+          <span class="audio-output-text">번역 음성 듣기</span>
+          <input
+            id="toggleAudioOutput"
+            type="checkbox"
+            switch
+            aria-label="번역 음성 듣기"
+          />
+        </label>
+
         <!-- Primary Start / Stop Microphone Button -->
         <button type="button" class="btn btn-primary-mic" id="btnToggleMic" data-recording="false">
-          <span class="material-symbols-outlined" id="micIcon">mic</span>
+          <span class="material-symbols-outlined" id="micIcon" aria-hidden="true">mic</span>
           <span id="micBtnText">통역 시작</span>
           <span class="audio-bars" id="audioBars" hidden aria-hidden="true">
             <i class="bar b1"></i>
@@ -281,9 +172,13 @@
             <span class="collapsed-preview" id="sourceCollapsedPreview" hidden></span>
           </div>
           <div class="panel-actions">
+            <span class="latency-badge blue-latency" id="sourceLatencyBadge" title="오디오 입력 이후 원문 텍스트가 아직 나오지 않은 시간 (실시간 갱신)" hidden>
+              <span class="material-symbols-outlined" aria-hidden="true">timer</span>
+              <span id="sourceLatencyValue">-</span>
+            </span>
             <span class="count-badge" id="sourceCountBadge">0문장</span>
-            <button type="button" class="panel-action-btn" id="btnCopySource" title="Source 텍스트 전체 복사">
-              <span class="material-symbols-outlined">content_copy</span>
+            <button type="button" class="panel-action-btn" id="btnCopySource" title="Source 텍스트 전체 복사" aria-label="Source 텍스트 전체 복사">
+              <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
               <span class="action-btn-label">복사</span>
             </button>
             <button
@@ -292,23 +187,24 @@
               id="btnToggleSourceCollapse"
               aria-expanded="true"
               aria-controls="sourceScrollArea"
+              aria-label="Source 영역 접기 / 펼치기"
               title="Source 영역 접기 / 펼치기 (접으면 Target이 넓어집니다)"
             >
-              <span class="material-symbols-outlined" id="sourceCollapseIcon">unfold_less</span>
+              <span class="material-symbols-outlined" id="sourceCollapseIcon" aria-hidden="true">unfold_less</span>
               <span class="action-btn-label" id="sourceCollapseLabel">접기</span>
             </button>
           </div>
         </div>
 
-        <div class="transcript-scroll-area" id="sourceScrollArea" role="log" aria-live="polite">
+        <div class="transcript-scroll-area" id="sourceScrollArea" role="log" aria-live="off" aria-label="Source 원문 기록" tabindex="0">
           <div class="empty-state" id="sourceEmptyState">
-            <span class="material-symbols-outlined empty-icon blue-icon">graphic_eq</span>
+            <span class="material-symbols-outlined empty-icon blue-icon" aria-hidden="true">graphic_eq</span>
             <p class="empty-title">마이크를 켜고 말씀해 주세요</p>
             <p class="empty-desc">입력되는 음성이 실시간으로 인식되어 문장별로 줄바꿈되어 표시됩니다.</p>
           </div>
           <div class="utterance-list" id="sourceUtteranceList"></div>
           <button type="button" class="jump-latest-btn" id="btnJumpSourceLatest" hidden>
-            <span class="material-symbols-outlined">arrow_downward</span>
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span>
             <span>최신 문장</span>
           </button>
         </div>
@@ -323,33 +219,40 @@
             <span class="lang-tag green-tag" id="targetPanelLangTag">한국어 (ko)</span>
           </div>
           <div class="panel-actions">
+            <span class="latency-badge green-latency" id="targetLatencyBadge" title="오디오 입력 이후 번역 텍스트가 아직 나오지 않은 시간 (끝에서 끝까지, 실시간 갱신)" hidden>
+              <span class="material-symbols-outlined" aria-hidden="true">timer</span>
+              <span id="targetLatencyValue">-</span>
+            </span>
             <span class="count-badge" id="targetCountBadge">0문장</span>
-            <button type="button" class="panel-action-btn" id="btnCopyTarget" title="Target 번역 텍스트 전체 복사">
-              <span class="material-symbols-outlined">content_copy</span>
+            <button type="button" class="panel-action-btn" id="btnCopyTarget" title="Target 번역 텍스트 전체 복사" aria-label="Target 번역 텍스트 전체 복사">
+              <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
               <span class="action-btn-label">복사</span>
             </button>
           </div>
         </div>
 
-        <div class="transcript-scroll-area" id="targetScrollArea" role="log" aria-live="polite">
+        <div class="transcript-scroll-area" id="targetScrollArea" role="log" aria-live="off" aria-label="Target 번역 기록" tabindex="0">
           <div class="empty-state" id="targetEmptyState">
-            <span class="material-symbols-outlined empty-icon green-icon">translate</span>
+            <span class="material-symbols-outlined empty-icon green-icon" aria-hidden="true">translate</span>
             <p class="empty-title">실시간 번역 결과가 이곳에 표시됩니다</p>
             <p class="empty-desc">Source를 접으면 번역 화면을 더욱 넓고 크게 볼 수 있습니다.</p>
           </div>
           <div class="utterance-list" id="targetUtteranceList"></div>
           <button type="button" class="jump-latest-btn green" id="btnJumpTargetLatest" hidden>
-            <span class="material-symbols-outlined">arrow_downward</span>
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span>
             <span>최신 문장</span>
           </button>
         </div>
       </section>
     </main>
+
+    <!-- Bottom Status Footer (Small gray status line below Target Text box) -->
+    <footer class="app-footer" id="appFooter">
+      <div id="toastMessage" class="toast-snackbar" role="status" aria-live="polite" hidden></div>
+      <div id="srAnnouncer" class="sr-only" aria-live="polite" aria-atomic="false"></div>
+    </footer>
   </div>
 
-  <!-- Floating Toast Snackbar -->
-  <div id="toastMessage" class="toast-snackbar" role="status" aria-live="polite" hidden></div>
-
-  <script src="/static/app.js?v=20261013i" defer></script>
+  <script src="/static/app.js?v=20261017c" defer></script>
 </body>
 </html>
