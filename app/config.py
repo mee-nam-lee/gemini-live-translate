@@ -296,79 +296,108 @@ def _get_async_credentials_lock() -> asyncio.Lock:
     return _ASYNC_CREDENTIALS_LOCK
 
 
+def _needs_refresh(creds: google.auth.credentials.Credentials) -> bool:
+    """True when the token is missing or has < PROACTIVE_REFRESH_MARGIN_SECONDS left."""
+    if not creds.token or not creds.expiry:
+        return True
+    margin = datetime.timedelta(seconds=PROACTIVE_REFRESH_MARGIN_SECONDS)
+    return auth_helpers.utcnow() >= creds.expiry - margin
+
+
+def _load_adc_credentials() -> google.auth.credentials.Credentials:
+    """AUTH_MODE=adc: the runtime's ADC identity (Cloud Run service account / local gcloud ADC)."""
+    creds, adc_project = google.auth.default(scopes=CLOUD_PLATFORM_SCOPES)
+    logger.info(
+        "Loaded ADC credentials (%s, adc_project=%s, gemini_project=%s)",
+        type(creds).__name__,
+        adc_project,
+        GEMINI_PROJECT,
+    )
+    return creds
+
+
+def _load_secret_manager_credentials() -> google.auth.credentials.Credentials:
+    """AUTH_MODE=secret_manager: user OAuth credentials from USER_CREDENTIALS_SECRET."""
+    global _LAST_CREDENTIAL_LOAD_FAILURE_TS
+    if (
+        _LAST_CREDENTIAL_LOAD_FAILURE_TS is not None
+        and time.monotonic() - _LAST_CREDENTIAL_LOAD_FAILURE_TS
+        < CREDENTIAL_LOAD_FAILURE_TTL_SECONDS
+    ):
+        # Recently failed; don't hammer Secret Manager on every request.
+        raise RuntimeError(
+            "Gemini user credentials are unavailable (recent Secret Manager load failed)."
+        )
+    info = _load_user_credentials_info()
+    if not info:
+        _LAST_CREDENTIAL_LOAD_FAILURE_TS = time.monotonic()
+        logger.error(
+            "Could not load Gemini user credentials from Secret Manager "
+            "(project=%s, secret=%s); retrying in %ds.",
+            GOOGLE_CLOUD_PROJECT,
+            USER_CREDENTIALS_SECRET,
+            CREDENTIAL_LOAD_FAILURE_TTL_SECONDS,
+        )
+        raise RuntimeError(
+            "Could not load Gemini user credentials from Secret Manager "
+            f"(project={GOOGLE_CLOUD_PROJECT}, secret={USER_CREDENTIALS_SECRET})."
+        )
+    _LAST_CREDENTIAL_LOAD_FAILURE_TS = None
+    cred_type = info.get("type", "authorized_user")
+    target_quota_project = (
+        GEMINI_PROJECT
+        or info.get("quota_project_id")
+        or GOOGLE_CLOUD_PROJECT
+    )
+    if cred_type == "authorized_user":
+        merged_info = {
+            **info,
+            "quota_project_id": target_quota_project,
+        }
+        return AutoRefreshingUserCredentials.from_authorized_user_info(
+            merged_info,
+            scopes=CLOUD_PLATFORM_SCOPES,
+        )
+    creds, _ = google.auth.load_credentials_from_dict(
+        info,
+        scopes=CLOUD_PLATFORM_SCOPES,
+        quota_project_id=target_quota_project,
+    )
+    return creds
+
+
 def get_gemini_credentials(
     force_refresh: bool = False,
 ) -> Optional[google.auth.credentials.Credentials]:
     """
-    AUTH_MODE=secret_manager only: return the shared auto-refreshing credentials for calling
-    Gemini in GEMINI_PROJECT, ensuring the access token is currently valid (with a 15-minute
-    proactive refresh margin). Raises RuntimeError if the credentials cannot be loaded
-    (no silent fallback to the runtime's ADC identity).
-    Returns None in adc / api_key modes (the GenAI SDK resolves ADC itself).
+    Return the shared credentials for calling Gemini in GEMINI_PROJECT, ensuring the access
+    token has at least 15 minutes left (proactive refresh margin):
+    - adc            : the runtime's ADC identity.
+    - secret_manager : user OAuth credentials from Secret Manager. Raises RuntimeError if they
+                       cannot be loaded (no silent fallback to the runtime's ADC identity).
+    - api_key        : returns None.
     Blocking (network I/O): call via `async_ensure_valid_gemini_credentials()` from async code.
     """
-    global _CACHED_GEMINI_CREDENTIALS, _LAST_CREDENTIAL_LOAD_FAILURE_TS
-    if AUTH_MODE != AUTH_MODE_SECRET_MANAGER:
+    global _CACHED_GEMINI_CREDENTIALS
+    if AUTH_MODE == AUTH_MODE_API_KEY:
         return None
     with _CREDENTIALS_LOCK:
         if _CACHED_GEMINI_CREDENTIALS is None:
-            if (
-                _LAST_CREDENTIAL_LOAD_FAILURE_TS is not None
-                and time.monotonic() - _LAST_CREDENTIAL_LOAD_FAILURE_TS
-                < CREDENTIAL_LOAD_FAILURE_TTL_SECONDS
-            ):
-                # Recently failed; don't hammer Secret Manager on every request.
-                raise RuntimeError(
-                    "Gemini user credentials are unavailable (recent Secret Manager load failed)."
-                )
-            info = _load_user_credentials_info()
-            if not info:
-                _LAST_CREDENTIAL_LOAD_FAILURE_TS = time.monotonic()
-                logger.error(
-                    "Could not load Gemini user credentials from Secret Manager "
-                    "(project=%s, secret=%s); retrying in %ds.",
-                    GOOGLE_CLOUD_PROJECT,
-                    USER_CREDENTIALS_SECRET,
-                    CREDENTIAL_LOAD_FAILURE_TTL_SECONDS,
-                )
-                raise RuntimeError(
-                    "Could not load Gemini user credentials from Secret Manager "
-                    f"(project={GOOGLE_CLOUD_PROJECT}, secret={USER_CREDENTIALS_SECRET})."
-                )
-            _LAST_CREDENTIAL_LOAD_FAILURE_TS = None
-            cred_type = info.get("type", "authorized_user")
-            target_quota_project = (
-                GEMINI_PROJECT
-                or info.get("quota_project_id")
-                or GOOGLE_CLOUD_PROJECT
+            _CACHED_GEMINI_CREDENTIALS = (
+                _load_secret_manager_credentials()
+                if AUTH_MODE == AUTH_MODE_SECRET_MANAGER
+                else _load_adc_credentials()
             )
-            if cred_type == "authorized_user":
-                merged_info = {
-                    **info,
-                    "quota_project_id": target_quota_project,
-                }
-                _CACHED_GEMINI_CREDENTIALS = (
-                    AutoRefreshingUserCredentials.from_authorized_user_info(
-                        merged_info,
-                        scopes=CLOUD_PLATFORM_SCOPES,
-                    )
-                )
-            else:
-                creds, _ = google.auth.load_credentials_from_dict(
-                    info,
-                    scopes=CLOUD_PLATFORM_SCOPES,
-                    quota_project_id=target_quota_project,
-                )
-                _CACHED_GEMINI_CREDENTIALS = creds
 
-        if (
-            force_refresh
-            or not _CACHED_GEMINI_CREDENTIALS.token
-            or _CACHED_GEMINI_CREDENTIALS.expired
-        ):
-            _CACHED_GEMINI_CREDENTIALS.refresh(Request())
-
-        return _CACHED_GEMINI_CREDENTIALS
+        creds = _CACHED_GEMINI_CREDENTIALS
+        if force_refresh or _needs_refresh(creds):
+            creds.refresh(Request())
+            if AUTH_MODE == AUTH_MODE_ADC:
+                logger.info(
+                    "Refreshed ADC access token (expires_at=%s UTC)",
+                    creds.expiry.strftime("%Y-%m-%d %H:%M:%S") if creds.expiry else "unknown",
+                )
+        return creds
 
 
 async def async_ensure_valid_gemini_credentials(
@@ -377,9 +406,9 @@ async def async_ensure_valid_gemini_credentials(
     """
     Asynchronously ensure that the Gemini OAuth2 token is fresh without blocking the event loop.
     Safe to call before every Live WebSocket connect/reconnect and HTTP summarize request.
-    No-op (returns None) unless AUTH_MODE=secret_manager.
+    No-op (returns None) when AUTH_MODE=api_key.
     """
-    if AUTH_MODE != AUTH_MODE_SECRET_MANAGER:
+    if AUTH_MODE == AUTH_MODE_API_KEY:
         return None
     lock = _get_async_credentials_lock()
     async with lock:
@@ -405,9 +434,9 @@ def create_genai_client(
 
     target_location = location_override or GOOGLE_CLOUD_LOCATION or "global"
     target_project = GEMINI_PROJECT or GOOGLE_CLOUD_PROJECT
+    creds = credentials if credentials is not None else _CACHED_GEMINI_CREDENTIALS
 
     if AUTH_MODE == AUTH_MODE_SECRET_MANAGER:
-        creds = credentials if credentials is not None else _CACHED_GEMINI_CREDENTIALS
         if creds is None:
             raise RuntimeError(
                 "AUTH_MODE=secret_manager but Gemini user credentials are not loaded."
@@ -422,13 +451,14 @@ def create_genai_client(
             ),
         )
 
-    # adc (or api_key without a key): the SDK resolves the runtime's ADC identity itself.
+    # adc (or api_key without a key): shared ADC credentials when loaded, else the SDK
+    # resolves the runtime's ADC identity itself.
+    client_kwargs = {"vertexai": True, "location": target_location}
     if target_project:
-        return genai.Client(
-            vertexai=True, project=target_project, location=target_location
-        )
-
-    return genai.Client(vertexai=True, location=target_location)
+        client_kwargs["project"] = target_project
+    if creds is not None and AUTH_MODE == AUTH_MODE_ADC:
+        client_kwargs["credentials"] = creds
+    return genai.Client(**client_kwargs)
 
 
 # Official 78 languages supported by gemini-3.5-live-translate-preview

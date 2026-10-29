@@ -56,10 +56,6 @@ logger = logging.getLogger("live-translate")
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
-# Background check interval to ensure OAuth2 access tokens are refreshed well before 60m expiry
-BACKGROUND_TOKEN_REFRESH_INTERVAL_SECONDS = 900  # 15 minutes
-# Maximum duration for a single continuous WebSocket before proactive session resumption with fresh token
-MAX_SINGLE_WS_CONNECTION_SECONDS = 2700  # 45 minutes
 # Echo (transcribe instead of translate when input is already in target language) is off by default
 DEFAULT_ECHO_TARGET_LANGUAGE = False
 
@@ -88,33 +84,31 @@ LANG_TAG_RE = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$")
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]+")
 
 
-async def _background_token_refresh_loop():
+async def _warm_up_gemini_credentials():
     """
-    Periodically check and refresh Gemini OAuth2 credentials so tokens never expire.
-    Only needed for AUTH_MODE=secret_manager (adc / api_key credentials are managed by the SDK).
+    Load Gemini credentials once at startup so auth/config problems surface in the startup logs.
+    No periodic refresh: tokens are refreshed on demand (< 15 minutes left) before every Live
+    connect/reconnect and summary request.
     """
-    if AUTH_MODE != AUTH_MODE_SECRET_MANAGER:
+    if AUTH_MODE == AUTH_MODE_API_KEY:
         return
     try:
-        # Initial warm-up on startup
         await async_ensure_valid_gemini_credentials(force_refresh=False)
-        logger.info(
-            "Initialized Gemini credentials from Secret Manager (Cloud Run project='%s', Gemini project='%s', secret='%s')",
-            GOOGLE_CLOUD_PROJECT,
-            GEMINI_PROJECT,
-            USER_CREDENTIALS_SECRET,
-        )
+        if AUTH_MODE == AUTH_MODE_SECRET_MANAGER:
+            logger.info(
+                "Initialized Gemini credentials from Secret Manager (Cloud Run project='%s', Gemini project='%s', secret='%s')",
+                GOOGLE_CLOUD_PROJECT,
+                GEMINI_PROJECT,
+                USER_CREDENTIALS_SECRET,
+            )
+        else:
+            logger.info(
+                "Initialized Gemini ADC credentials (Gemini project='%s')", GEMINI_PROJECT
+            )
+    except asyncio.CancelledError:
+        pass
     except Exception as exc:
         logger.warning("Initial Gemini credential warm-up warning: %s", exc)
-
-    while True:
-        try:
-            await asyncio.sleep(BACKGROUND_TOKEN_REFRESH_INTERVAL_SECONDS)
-            await async_ensure_valid_gemini_credentials(force_refresh=False)
-        except asyncio.CancelledError:
-            break
-        except Exception as exc:
-            logger.warning("Background OAuth2 token refresh check failed: %s", exc)
 
 
 def _log_auth_configuration() -> None:
@@ -172,7 +166,7 @@ async def lifespan(app: FastAPI):
     _log_security_posture()
     _log_auth_configuration()
     background_tasks = [
-        asyncio.create_task(_background_token_refresh_loop()),
+        asyncio.create_task(_warm_up_gemini_credentials()),
         asyncio.create_task(_session_registry_cleanup_loop()),
     ]
     try:
@@ -777,7 +771,7 @@ async def websocket_translate(websocket: WebSocket):
         "explicitly_stopped": False,
         "enable_session_management": True,
         "client_disconnected": False,
-        # Set when a reconnect is intentional (GoAway, token rotation, target change) so it
+        # Set when a reconnect is intentional (GoAway, target change) so it
         # doesn't count as a failure for backoff purposes.
         "planned_reconnect": False,
         "reconnect_reason": "",
@@ -1265,49 +1259,18 @@ async def websocket_translate(websocket: WebSocket):
             finally:
                 session_closed.set()
 
-        async def token_rotation_watchdog():
-            """
-            Proactively rotate long-running single WebSocket connections at 45 minutes
-            (well before the 60-minute OAuth2 Bearer token expiry) using SessionResumptionConfig.
-            """
-            try:
-                await asyncio.sleep(MAX_SINGLE_WS_CONNECTION_SECONDS)
-                if (
-                    not session_state["client_disconnected"]
-                    and not session_closed.is_set()
-                    and not force_reconnect_event.is_set()
-                ):
-                    logger.info(
-                        "Single WebSocket connection reached %ds; refreshing OAuth2 token and seamlessly extending session.",
-                        MAX_SINGLE_WS_CONNECTION_SECONDS,
-                    )
-                    try:
-                        await async_ensure_valid_gemini_credentials(force_refresh=True)
-                    except Exception as exc:
-                        logger.warning("Token refresh before rotation failed: %s", exc)
-                    session_state["planned_reconnect"] = True
-                    session_state["reconnect_reason"] = (
-                        "인증 토큰 자동 갱신 주기에 따라 세션을 무중단 연장합니다."
-                    )
-                    force_reconnect_event.set()
-            except asyncio.CancelledError:
-                pass
-
         sender_task = asyncio.create_task(upstream_sender())
         receiver_task = asyncio.create_task(upstream_receiver())
-        rotation_task = asyncio.create_task(token_rotation_watchdog())
 
         try:
             await asyncio.wait(
-                [sender_task, receiver_task, rotation_task],
+                [sender_task, receiver_task],
                 return_when=asyncio.FIRST_COMPLETED,
             )
         finally:
-            for task in (sender_task, receiver_task, rotation_task):
+            for task in (sender_task, receiver_task):
                 task.cancel()
-            await asyncio.gather(
-                sender_task, receiver_task, rotation_task, return_exceptions=True
-            )
+            await asyncio.gather(sender_task, receiver_task, return_exceptions=True)
 
     async def wait_before_retry(delay: float) -> None:
         """Sleep for `delay`, waking early if the client disconnects."""
