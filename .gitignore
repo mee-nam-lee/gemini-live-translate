@@ -23,3 +23,6 @@ key/
 
 # Xcode per-user state
 xcuserdata/
+
+# Personal iOS re-sign/install automation (device-specific; keep local)
+ios/scripts/

@@ -64,7 +64,7 @@
 
 ## 🚀 아이폰 빌드 및 설치 방법 (Xcode)
 
-1. Mac에서 Xcode 프로젝트를 엽니다 (macOS 26에서 Xcode 16 실행 시 직접 바이너리 호출):
+1. Mac에서 Xcode 프로젝트를 엽니다 (macOS 26에서 Xcode 16 실행 시 직접 바이너리 호출, 저장소 루트에서 실행):
    ```bash
    /Applications/Xcode.app/Contents/MacOS/Xcode ios/LiveTranslateApp.xcodeproj &
    ```
