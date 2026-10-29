@@ -2,10 +2,25 @@
 .vscode/
 __pycache__/
 *.pyc
-.env
-.env.example
+.env*
+*credentials*.json
+*.pem
 .git/
 .DS_Store
 README.md
 biz_requirement.md
 docs/
+ios/
+*_google.json
+
+# Apple signing certificates / provisioning profiles
+key/
+*.mobileprovision
+*.cer
+*.p12
+
+# Screen recordings
+*.MP4
+*.mp4
+*.mov
+*.MOV
